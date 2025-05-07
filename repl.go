@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
+
+	"github.com/GrahamZiervogel/pokedex/internal/pokecache"
 )
 
 type cliCommand struct {
@@ -16,11 +19,16 @@ type cliCommand struct {
 type Config struct {
 	Next     *string
 	Previous *string
+	Cache    *pokecache.Cache
 }
 
 func startRepl() {
 	scanner := bufio.NewScanner(os.Stdin)
-	cfg := &Config{}
+
+	cacheInterval := 5 * time.Minute
+	cfg := &Config{
+		Cache: pokecache.NewCache(cacheInterval),
+	}
 
 	for {
 		fmt.Print("Pokedex > ")

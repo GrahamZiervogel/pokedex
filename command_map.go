@@ -41,27 +41,37 @@ func commandMapb(cfg *Config) error {
 }
 
 func DisplayLocationAreas(cfg *Config, url string) error {
-	resp, err := http.Get(url)
+	var responseBody []byte
+	var err error
 
-	if err != nil {
-		return fmt.Errorf("error making HTTP request: %w", err)
-	}
-	defer resp.Body.Close()
+	cachedData, found := cfg.Cache.Get(url)
+	if found {
+		responseBody = cachedData
+	} else {
+		resp, err := http.Get(url)
 
-	if resp.StatusCode > 299 {
-		return fmt.Errorf("API request failed with status code: %d", resp.StatusCode)
-	}
+		if err != nil {
+			return fmt.Errorf("error making HTTP request: %w", err)
+		}
+		defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
+		if resp.StatusCode > 299 {
+			return fmt.Errorf("API request failed with status code: %d", resp.StatusCode)
+		}
 
-	if err != nil {
-		return fmt.Errorf("error reading response body: %w", err)
+		responseBody, err = io.ReadAll(resp.Body)
+
+		if err != nil {
+			return fmt.Errorf("error reading response body: %w", err)
+		}
+
+		cfg.Cache.Add(url, responseBody)
 	}
 
 	var locationResponse LocationAreaResponse
-	err = json.Unmarshal(body, &locationResponse)
+	err = json.Unmarshal(responseBody, &locationResponse)
 	if err != nil {
-		return fmt.Errorf("error unmarshalling JSON: %w", err)
+		return fmt.Errorf("error unmarshalling JSON for %s: %w", url, err)
 	}
 
 	cfg.Next = locationResponse.Next

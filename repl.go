@@ -7,27 +7,31 @@ import (
 	"strings"
 	"time"
 
-	"github.com/GrahamZiervogel/pokedex/internal/pokecache"
+	"github.com/GrahamZiervogel/pokedex/internal/pokeapi"
 )
 
 type cliCommand struct {
 	name        string
 	description string
-	callback    func(cfg *Config) error
+	callback    func(cfg *Config, args ...string) error
 }
 
 type Config struct {
-	Next     *string
-	Previous *string
-	Cache    *pokecache.Cache
+	PokeapiClient            *pokeapi.Client
+	NextLocationAreasURL     *string
+	PreviousLocationAreasURL *string
 }
 
 func startRepl() {
 	scanner := bufio.NewScanner(os.Stdin)
 
-	cacheInterval := 5 * time.Minute
+	httpClientTimeout := 5 * time.Second
+	cacheReapInterval := 5 * time.Minute
+
+	pokeClient := pokeapi.NewClient(httpClientTimeout, cacheReapInterval)
+
 	cfg := &Config{
-		Cache: pokecache.NewCache(cacheInterval),
+		PokeapiClient: pokeClient,
 	}
 
 	for {
@@ -49,16 +53,19 @@ func startRepl() {
 		}
 
 		commandName := cleanedWords[0]
+		args := []string{}
+		if len(cleanedWords) > 1 {
+			args = cleanedWords[1:]
+		}
+
 		command, exists := getCommands()[commandName]
 		if exists {
-			err := command.callback(cfg)
+			err := command.callback(cfg, args...)
 			if err != nil {
 				fmt.Println(err)
 			}
-			continue
 		} else {
 			fmt.Println("Unknown command")
-			continue
 		}
 	}
 }
@@ -66,9 +73,7 @@ func startRepl() {
 func cleanInput(text string) []string {
 	trimmedText := strings.TrimSpace(text)
 	lowercasedText := strings.ToLower(trimmedText)
-
 	words := strings.Fields(lowercasedText)
-
 	return words
 }
 

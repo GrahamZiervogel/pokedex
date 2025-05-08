@@ -1,87 +1,64 @@
 package main
 
 import (
-	"encoding/json"
+	"errors"
 	"fmt"
-	"io"
-	"net/http"
 )
 
-const baseURL = "https://pokeapi.co/api/v2/location-area"
-
-type LocationAreaResponse struct {
-	Count    int     `json:"count"`
-	Next     *string `json:"next"`
-	Previous *string `json:"previous"`
-	Results  []struct {
-		Name string `json:"name"`
-		URL  string `json:"url"`
-	} `json:"results"`
-}
-
-func commandMap(cfg *Config) error {
-	url := baseURL
-
-	if cfg.Next != nil && *cfg.Next != "" {
-		url = *cfg.Next
+func commandMap(cfg *Config, args ...string) error {
+	if len(args) > 0 {
+		return errors.New("map command does not take any arguments")
 	}
 
-	return DisplayLocationAreas(cfg, url)
-}
+	fmt.Println("Fetching next location areas...")
+	locationResponse, err := cfg.PokeapiClient.ListLocationAreas(cfg.NextLocationAreasURL)
+	if err != nil {
+		return fmt.Errorf("could not get location areas: %w", err)
+	}
 
-func commandMapb(cfg *Config) error {
-	if cfg.Previous == nil || *cfg.Previous == "" {
-		fmt.Println("You are at the first page of locations.")
+	cfg.NextLocationAreasURL = locationResponse.Next
+	cfg.PreviousLocationAreasURL = locationResponse.Previous
+
+	if len(locationResponse.Results) == 0 {
+		fmt.Println("No more location areas found.")
 		return nil
 	}
 
-	url := *cfg.Previous
+	fmt.Println("Location Areas:")
+	for _, area := range locationResponse.Results {
+		fmt.Printf("- %s\n", area.Name)
+	}
 
-	return DisplayLocationAreas(cfg, url)
+	return nil
 }
 
-func DisplayLocationAreas(cfg *Config, url string) error {
-	var responseBody []byte
-	var err error
-
-	cachedData, found := cfg.Cache.Get(url)
-	if found {
-		responseBody = cachedData
-	} else {
-		resp, err := http.Get(url)
-
-		if err != nil {
-			return fmt.Errorf("error making HTTP request: %w", err)
-		}
-		defer resp.Body.Close()
-
-		if resp.StatusCode > 299 {
-			return fmt.Errorf("API request failed with status code: %d", resp.StatusCode)
-		}
-
-		responseBody, err = io.ReadAll(resp.Body)
-
-		if err != nil {
-			return fmt.Errorf("error reading response body: %w", err)
-		}
-
-		cfg.Cache.Add(url, responseBody)
+func commandMapb(cfg *Config, args ...string) error {
+	if len(args) > 0 {
+		return errors.New("mapb command does not take any arguments")
 	}
 
-	var locationResponse LocationAreaResponse
-	err = json.Unmarshal(responseBody, &locationResponse)
+	if cfg.PreviousLocationAreasURL == nil || *cfg.PreviousLocationAreasURL == "" {
+		fmt.Println("You are at the first page of locations, cannot go back.")
+		return nil
+	}
+
+	fmt.Println("Fetching previous location areas...")
+	locationResponse, err := cfg.PokeapiClient.ListLocationAreas(cfg.PreviousLocationAreasURL)
 	if err != nil {
-		return fmt.Errorf("error unmarshalling JSON for %s: %w", url, err)
+		return fmt.Errorf("could not get previous location areas: %w", err)
 	}
 
-	cfg.Next = locationResponse.Next
-	cfg.Previous = locationResponse.Previous
+	cfg.NextLocationAreasURL = locationResponse.Next
+	cfg.PreviousLocationAreasURL = locationResponse.Previous
 
-	for _, area := range locationResponse.Results {
-		fmt.Printf("%s\n", area.Name)
-	}
 	if len(locationResponse.Results) == 0 {
-		fmt.Println("No location areas found.")
+		fmt.Println("No location areas found on the previous page.")
+		return nil
+	}
+
+	fmt.Println("Location Areas (Previous):")
+	for _, area := range locationResponse.Results {
+		fmt.Printf("- %s\n", area.Name)
 	}
 
 	return nil

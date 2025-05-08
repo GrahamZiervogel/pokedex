@@ -99,5 +99,10 @@ func getCommands() map[string]cliCommand {
 			description: "Display the previous 20 location areas",
 			callback:    commandMapb,
 		},
+		"explore": {
+			name:        "explore <location_area_name>",
+			description: "Lists Pokémon in a given location area",
+			callback:    commandExplore,
+		},
 	}
 }

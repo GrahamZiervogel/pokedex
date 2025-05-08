@@ -20,6 +20,7 @@ type Config struct {
 	PokeapiClient            *pokeapi.Client
 	NextLocationAreasURL     *string
 	PreviousLocationAreasURL *string
+	Pokedex                  map[string]pokeapi.Pokemon
 }
 
 func startRepl() {
@@ -32,6 +33,7 @@ func startRepl() {
 
 	cfg := &Config{
 		PokeapiClient: pokeClient,
+		Pokedex:       make(map[string]pokeapi.Pokemon),
 	}
 
 	for {
@@ -103,6 +105,11 @@ func getCommands() map[string]cliCommand {
 			name:        "explore <location_area_name>",
 			description: "Lists Pokémon in a given location area",
 			callback:    commandExplore,
+		},
+		"catch": {
+			name:        "catch <pokemon_name>",
+			description: "Attempt to catch a Pokémon and add it to your Pokedex",
+			callback:    commandCatch,
 		},
 	}
 }
